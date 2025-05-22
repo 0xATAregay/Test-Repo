@@ -1,0 +1,11 @@
+* {
+    margin: 0px;
+    padding: 0px;
+    box-sizing: border-box;
+    font-family: 'Ubuntu';
+    text-align: center;
+}
+
+body {
+    background-color: #b3cbd2;
+}
