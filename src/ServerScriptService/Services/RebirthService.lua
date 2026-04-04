@@ -122,6 +122,7 @@ function RebirthService.attemptRebirth(player)
         upgrades = updatedData.upgrades,
         currentZone = updatedData.currentZone,
         rebirthCount = updatedData.rebirthCount,
+        ascensionCount = updatedData.ascensionCount or 0,
         spirits = updatedData.spirits,
         equippedSpirits = updatedData.equippedSpirits,
         pity = updatedData.pity,

@@ -30,6 +30,7 @@ local _activeTweens = {}
 local _upgrades = {}
 local _spirits = {}
 local _equippedSpirits = {}
+local _eventsWired = false
 
 -- Tween config
 local TWEEN_DURATION  = 0.35
@@ -264,6 +265,9 @@ function UIController.initialize(initialData)
 end
 
 function UIController.wireEvents()
+    if _eventsWired then return end
+    _eventsWired = true
+
     -- Currency updated (generic DataUpdate)
     RemoteEvents.DataUpdate.OnClientEvent:Connect(function(data)
         if data.type == "upgrade" then
