@@ -9,6 +9,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local RemoteEvents      = require(ReplicatedStorage.Shared.Events.RemoteEvents)
 local PlayerDataService = require(script.Parent.PlayerDataService)
+local QuestService      = require(script.Parent.QuestService)
 
 local UpgradeService = {}
 
@@ -195,7 +196,6 @@ local function _processPurchase(player, upgradeId)
     })
 
     -- Wire quest progress: track upgrade purchases
-    local QuestService = require(script.Parent.QuestService)
     QuestService.trackProgress(player, "upgrades", 1)
 
     print(string.format(

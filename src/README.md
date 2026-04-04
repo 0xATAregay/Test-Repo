@@ -22,7 +22,7 @@ src/
 │
 ├── ServerScriptService/            -- Server-only code
 │   ├── Core/
-│   │   └── Server.lua              -- Master bootstrapper
+│   │   └── Server.server.lua       -- Master bootstrapper (Script)
 │   ├── Services/
 │   │   ├── PlayerDataService.lua   -- ProfileService-based data persistence
 │   │   ├── CurrencyService.lua     -- All currency read/write operations
@@ -39,7 +39,7 @@ src/
 │
 └── StarterPlayer/StarterPlayerScripts/  -- Client-only code
     ├── Core/
-    │   └── Client.lua              -- Client bootstrapper
+    │   └── Client.client.lua       -- Client bootstrapper (LocalScript)
     └── Controllers/
         ├── UIController.lua        -- All UI state management
         ├── InputController.lua     -- Click/tap/keyboard input handling

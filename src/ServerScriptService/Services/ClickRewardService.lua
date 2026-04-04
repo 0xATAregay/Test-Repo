@@ -14,6 +14,7 @@ local ReplicatedStorage  = game:GetService("ReplicatedStorage")
 
 local RemoteEvents       = require(ReplicatedStorage.Shared.Events.RemoteEvents)
 local PlayerDataService  = require(script.Parent.PlayerDataService)
+local QuestService       = require(script.Parent.QuestService)
 
 -- Tuning constants
 local CONFIG = {
@@ -139,7 +140,6 @@ local function _handleClick(player)
     })
 
     -- Wire quest progress: track soul mining and click count
-    local QuestService = require(script.Parent.QuestService)
     QuestService.trackProgress(player, "mine_souls", soulsEarned)
     QuestService.trackProgress(player, "clicks", 1)
 
@@ -161,8 +161,7 @@ local function _handleClick(player)
         })
 
         -- Wire quest progress: track gem collection
-        local QuestServiceGem = require(script.Parent.QuestService)
-        QuestServiceGem.trackProgress(player, "collect_gems", 1)
+        QuestService.trackProgress(player, "collect_gems", 1)
     end
 end
 
