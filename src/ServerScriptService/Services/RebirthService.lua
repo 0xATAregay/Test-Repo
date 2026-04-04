@@ -208,6 +208,27 @@ function RebirthService.attemptAscension(player)
         godTierMultiplier = DataConfig.ASCENSION.godTierMultiplier,
     })
 
+    -- Full data resync so client UI reflects the reset
+    RemoteEvents.DataLoaded:FireClient(player, {
+        currencies = {
+            souls = 0,
+            gems = 0,
+            reaperTokens = updatedData.reaperTokens,
+            spiritShards = 0,
+        },
+        upgrades = updatedData.upgrades,
+        currentZone = updatedData.currentZone,
+        rebirthCount = updatedData.rebirthCount,
+        ascensionCount = updatedData.ascensionCount,
+        spirits = updatedData.spirits,
+        equippedSpirits = updatedData.equippedSpirits,
+        pity = updatedData.pity,
+        settings = updatedData.settings,
+        dailyQuests = updatedData.dailyQuests,
+        dailyRewardClaimed = updatedData.dailyRewardClaimed,
+        loginStreak = updatedData.loginStreak,
+    })
+
     RemoteEvents.ServerAnnouncement:FireAllClients({
         type = "ASCENSION",
         playerName = player.Name,

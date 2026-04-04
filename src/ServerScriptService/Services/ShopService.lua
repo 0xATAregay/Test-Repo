@@ -268,6 +268,16 @@ function ShopService.init()
     -- Wire shop data request
     RemoteEvents.RequestShopData.OnServerInvoke = handleShopDataRequest
 
+    -- Invalidate GamePass cache when a player purchases a pass in-session
+    MarketplaceService.PromptGamePassPurchaseFinished:Connect(function(player, passId, wasPurchased)
+        if wasPurchased then
+            local userId = player.UserId
+            if _gamePassCache[userId] then
+                _gamePassCache[userId][passId] = true
+            end
+        end
+    end)
+
     -- Clean up on player leave
     Players.PlayerRemoving:Connect(function(player)
         local userId = player.UserId

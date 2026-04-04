@@ -185,18 +185,30 @@ function QuestService.handleDailyLogin(player)
 end
 
 function QuestService.init()
-    -- Generate quests on player join
+    -- Generate quests on player join (poll for data instead of fixed delay)
     Players.PlayerAdded:Connect(function(player)
-        -- Wait for data to load
-        task.delay(2, function()
+        task.spawn(function()
+            local maxWait = 30
+            local waited = 0
+            while waited < maxWait and not PlayerDataService.IsDataLoaded(player) do
+                task.wait(1)
+                waited = waited + 1
+            end
             if PlayerDataService.IsDataLoaded(player) then
                 QuestService.handleDailyLogin(player)
                 QuestService.generateDailyQuests(player)
+            else
+                warn("[QuestService] Data never loaded for " .. player.Name .. ", skipping daily setup.")
             end
         end)
     end)
 
-    -- Handle quest claim requests via daily reward event
+    -- Handle quest reward claims
+    RemoteEvents.ClaimQuestReward.OnServerEvent:Connect(function(player, questId)
+        QuestService.claimReward(player, questId)
+    end)
+
+    -- Handle daily reward claims (separate 7-day cycle system)
     RemoteEvents.ClaimDailyReward.OnServerEvent:Connect(function(player)
         local data = PlayerDataService.GetData(player)
         if not data then return end

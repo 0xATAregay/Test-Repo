@@ -61,6 +61,7 @@ local RemoteEvents = {
 
     -- Quests
     QuestUpdate         = getOrCreate("RemoteEvent",    "QuestUpdate"),         -- Server -> Client: quest progress
+    ClaimQuestReward    = getOrCreate("RemoteEvent",    "ClaimQuestReward"),    -- Client -> Server: claim completed quest
 
     -- Shop (GamePasses validated server-side, dev products fire MarketplaceService)
     RequestShopData     = getOrCreate("RemoteFunction", "RequestShopData"),     -- Client -> Server: get pass ownership

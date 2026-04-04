@@ -1,7 +1,8 @@
 -- ============================================================================
--- Client.lua
+-- Client.client.lua
 -- Client-side bootstrapper.
 -- Initializes all controllers after data is received from server.
+-- Handles re-syncs on rebirth/ascension via subsequent DataLoaded events.
 -- ============================================================================
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -16,9 +17,18 @@ local RewardJuiceController
 local Client = {}
 local _initialized = false
 
--- Wait for server to confirm our data is loaded before initializing UI
+-- Wait for server to confirm our data is loaded before initializing UI.
+-- Subsequent DataLoaded events (e.g. after rebirth/ascension) trigger a
+-- full UI resync without re-initializing controllers.
 RemoteEvents.DataLoaded.OnClientEvent:Connect(function(initialData)
-    if _initialized then return end
+    if _initialized then
+        -- Re-sync: rebirth or ascension reset all data, update UI state
+        print("[Client] DataLoaded resync received (rebirth/ascension). Updating UI...")
+        if UIController then
+            UIController.initialize(initialData)
+        end
+        return
+    end
     _initialized = true
 
     print("[Client] Data received from server. Initializing controllers...")

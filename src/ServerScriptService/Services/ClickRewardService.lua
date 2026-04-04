@@ -67,6 +67,10 @@ local function _getSoulsReward(player, profile)
     local damageLevel  = (profile.upgrades and profile.upgrades.swingDamage) or 0
     local upgradeBonus = damageLevel * 8
 
+    -- Soul multiplier upgrade (5% per level)
+    local soulMultLevel = (profile.upgrades and profile.upgrades.soulMultiplier) or 0
+    local soulMult = 1.0 + (soulMultLevel * 0.05)
+
     local rebirthMult  = 1 + ((profile.rebirthCount or 0) * 0.15)
     local ascensionMult = 1 + ((profile.ascensionCount or 0) * 4.0)
 
@@ -91,7 +95,7 @@ local function _getSoulsReward(player, profile)
         zoneMult = zoneData.multiplier
     end
 
-    return math.max(1, math.floor((base + upgradeBonus) * rebirthMult * ascensionMult * spiritMult * zoneMult))
+    return math.max(1, math.floor((base + upgradeBonus) * soulMult * rebirthMult * ascensionMult * spiritMult * zoneMult))
 end
 
 -- Core click handler
