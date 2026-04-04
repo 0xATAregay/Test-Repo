@@ -113,20 +113,25 @@ function EggService.openEgg(player, eggId, quantity)
         pityEpicAt = eggConfig.pityEpicAt,
         pityLegendaryAt = eggConfig.pityLegendaryAt,
     })
+
+    -- Wire quest progress: track egg hatches
+    local QuestService = require(script.Parent.QuestService)
+    QuestService.trackProgress(player, "hatch_eggs", quantity)
 end
 
 --[[
-    EggService.equipSpirit(player, spiritId)
-    Equips a spirit from inventory. Max 3 equipped at once.
+    EggService.equipSpirit(player, spiritUid)
+    Equips a spirit from inventory by its unique instance key (uid).
+    Max 3 equipped at once.
 ]]
-function EggService.equipSpirit(player, spiritId)
+function EggService.equipSpirit(player, spiritUid)
     local data = PlayerDataService.GetData(player)
     if not data then return end
 
-    -- Verify spirit exists in inventory
+    -- Verify spirit exists in inventory by uid
     local found = false
     for _, spirit in ipairs(data.spirits) do
-        if spirit.id == spiritId then
+        if spirit.uid == spiritUid then
             found = true
             break
         end
@@ -142,7 +147,7 @@ function EggService.equipSpirit(player, spiritId)
 
     -- Check if already equipped
     for _, equipped in ipairs(data.equippedSpirits) do
-        if equipped == spiritId then
+        if equipped == spiritUid then
             RemoteEvents.EquipResult:FireClient(player, {
                 success = false,
                 reason = "Spirit is already equipped.",
@@ -161,7 +166,7 @@ function EggService.equipSpirit(player, spiritId)
     end
 
     PlayerDataService.UpdateData(player, function(d)
-        table.insert(d.equippedSpirits, spiritId)
+        table.insert(d.equippedSpirits, spiritUid)
     end)
 
     local updatedData = PlayerDataService.GetData(player)
@@ -176,16 +181,16 @@ function EggService.equipSpirit(player, spiritId)
 end
 
 --[[
-    EggService.unequipSpirit(player, spiritId)
-    Removes a spirit from the equipped list.
+    EggService.unequipSpirit(player, spiritUid)
+    Removes a spirit from the equipped list by uid.
 ]]
-function EggService.unequipSpirit(player, spiritId)
+function EggService.unequipSpirit(player, spiritUid)
     local data = PlayerDataService.GetData(player)
     if not data then return end
 
     local foundIndex = nil
     for i, equipped in ipairs(data.equippedSpirits) do
-        if equipped == spiritId then
+        if equipped == spiritUid then
             foundIndex = i
             break
         end
@@ -220,12 +225,12 @@ function EggService.init()
         EggService.openEgg(player, eggId, quantity or 1)
     end)
 
-    RemoteEvents.EquipSpirit.OnServerEvent:Connect(function(player, spiritId)
-        EggService.equipSpirit(player, spiritId)
+    RemoteEvents.EquipSpirit.OnServerEvent:Connect(function(player, spiritUid)
+        EggService.equipSpirit(player, spiritUid)
     end)
 
-    RemoteEvents.UnequipSpirit.OnServerEvent:Connect(function(player, spiritId)
-        EggService.unequipSpirit(player, spiritId)
+    RemoteEvents.UnequipSpirit.OnServerEvent:Connect(function(player, spiritUid)
+        EggService.unequipSpirit(player, spiritUid)
     end)
 
     Players.PlayerRemoving:Connect(function(player)

@@ -163,13 +163,23 @@ function RarityConfig.rollRarity(eggId, currentPity)
     return "COMMON", newPity -- fallback (should never reach)
 end
 
+-- Generate a unique instance key for each spirit obtained.
+-- Uses a combination of timestamp and random to avoid collisions.
+local _uidCounter = 0
+function RarityConfig._generateUID()
+    _uidCounter = _uidCounter + 1
+    return string.format("%s_%d_%d", os.time(), math.random(10000, 99999), _uidCounter)
+end
+
 -- Pick a random spirit from the rolled rarity tier
 function RarityConfig.rollSpirit(rarity)
     local pool = RarityConfig.SPIRITS[rarity]
     assert(pool and #pool > 0, "No spirits defined for rarity: " .. tostring(rarity))
     local picked = pool[math.random(1, #pool)]
-    -- Return a copy so we don't mutate the config table
+    -- Return a copy with a unique instance key (uid) so duplicate spirits
+    -- (e.g., two "phantom_wolf") can be independently equipped/unequipped.
     return {
+        uid = RarityConfig._generateUID(),
         id = picked.id,
         name = picked.name,
         rarity = rarity,

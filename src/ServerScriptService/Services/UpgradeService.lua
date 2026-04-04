@@ -194,6 +194,10 @@ local function _processPurchase(player, upgradeId)
         newBalance = data[cfg.currency],
     })
 
+    -- Wire quest progress: track upgrade purchases
+    local QuestService = require(script.Parent.QuestService)
+    QuestService.trackProgress(player, "upgrades", 1)
+
     print(string.format(
         "[UpgradeService] %s purchased '%s' -> level %d",
         player.Name, upgradeId, confirmedLevel

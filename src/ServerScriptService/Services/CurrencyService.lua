@@ -127,11 +127,11 @@ function CurrencyService.calculateMineReward(player)
     -- Ascension multiplier
     local ascensionMultiplier = 1 + ((data.ascensionCount or 0) * (DataConfig.ASCENSION.godTierMultiplier - 1))
 
-    -- Spirit multipliers (product of equipped spirit multipliers)
+    -- Spirit multipliers (equippedSpirits stores uid strings)
     local spiritMultiplier = 1.0
-    for _, spiritData in ipairs(data.equippedSpirits) do
+    for _, spiritUid in ipairs(data.equippedSpirits) do
         for _, spirit in ipairs(data.spirits) do
-            if spirit.id == spiritData then
+            if spirit.uid == spiritUid then
                 spiritMultiplier = spiritMultiplier * spirit.multiplier
                 break
             end

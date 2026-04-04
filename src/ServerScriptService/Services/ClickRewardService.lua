@@ -69,12 +69,12 @@ local function _getSoulsReward(player, profile)
     local rebirthMult  = 1 + ((profile.rebirthCount or 0) * 0.15)
     local ascensionMult = 1 + ((profile.ascensionCount or 0) * 4.0)
 
-    -- Spirit multiplier
+    -- Spirit multiplier (equippedSpirits stores uid strings)
     local spiritMult = 1.0
     if profile.equippedSpirits and profile.spirits then
-        for _, spiritId in ipairs(profile.equippedSpirits) do
+        for _, spiritUid in ipairs(profile.equippedSpirits) do
             for _, spirit in ipairs(profile.spirits) do
-                if spirit.id == spiritId then
+                if spirit.uid == spiritUid then
                     spiritMult = spiritMult * spirit.multiplier
                     break
                 end
@@ -138,6 +138,11 @@ local function _handleClick(player)
         delta       = soulsEarned,
     })
 
+    -- Wire quest progress: track soul mining and click count
+    local QuestService = require(script.Parent.QuestService)
+    QuestService.trackProgress(player, "mine_souls", soulsEarned)
+    QuestService.trackProgress(player, "clicks", 1)
+
     -- Small chance to drop gems
     local DataConfig = require(game.ReplicatedStorage.Shared.Modules.DataConfig)
     local gemConfig = DataConfig.UPGRADES.gemFindChance
@@ -154,6 +159,10 @@ local function _handleClick(player)
             newBalance = newData and newData.gems or 0,
             delta      = 1,
         })
+
+        -- Wire quest progress: track gem collection
+        local QuestServiceGem = require(script.Parent.QuestService)
+        QuestServiceGem.trackProgress(player, "collect_gems", 1)
     end
 end
 

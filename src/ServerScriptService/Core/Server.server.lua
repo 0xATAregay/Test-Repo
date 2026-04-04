@@ -1,7 +1,8 @@
 -- ============================================================================
--- Server.lua
+-- Server.server.lua
 -- Master bootstrapper. Initializes all services and wires up event handlers.
 -- This is the ONLY script that should call require() on multiple services.
+-- Named .server.lua so Rojo creates a Script (not ModuleScript).
 -- ============================================================================
 
 local Players = game:GetService("Players")
@@ -44,15 +45,19 @@ LeaderboardService.init()
 -- This section is for cross-service coordination after data loads.
 -- ============================================================================
 
+-- Track which players have received initial data (kept outside profile.Data
+-- so this transient flag never gets persisted to DataStore).
+local _initialDataSent = {} -- [player] = true
+
 -- Post-data-load setup: fire initial data to client
 task.spawn(function()
     while true do
         task.wait(1)
         for _, player in ipairs(Players:GetPlayers()) do
-            if PlayerDataService.IsDataLoaded(player) then
+            if PlayerDataService.IsDataLoaded(player) and not _initialDataSent[player] then
                 local data = PlayerDataService.GetData(player)
-                if data and not data._initialDataSent then
-                    data._initialDataSent = true
+                if data then
+                    _initialDataSent[player] = true
 
                     RemoteEvents.DataLoaded:FireClient(player, {
                         currencies = {
@@ -77,6 +82,10 @@ task.spawn(function()
             end
         end
     end
+end)
+
+Players.PlayerRemoving:Connect(function(player)
+    _initialDataSent[player] = nil
 end)
 
 print("[Server] Soul Miners initialization complete.")
