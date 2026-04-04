@@ -15,6 +15,8 @@ local ReplicatedStorage  = game:GetService("ReplicatedStorage")
 local RemoteEvents       = require(ReplicatedStorage.Shared.Events.RemoteEvents)
 local PlayerDataService  = require(script.Parent.PlayerDataService)
 local QuestService       = require(script.Parent.QuestService)
+local ShopService        = require(script.Parent.ShopService)
+local DataConfig         = require(ReplicatedStorage.Shared.Modules.DataConfig)
 
 -- Tuning constants
 local CONFIG = {
@@ -67,9 +69,9 @@ local function _getSoulsReward(player, profile)
     local damageLevel  = (profile.upgrades and profile.upgrades.swingDamage) or 0
     local upgradeBonus = damageLevel * 8
 
-    -- Soul multiplier upgrade (5% per level)
+    -- Soul multiplier upgrade (valuePerLevel from DataConfig, single source of truth)
     local soulMultLevel = (profile.upgrades and profile.upgrades.soulMultiplier) or 0
-    local soulMult = 1.0 + (soulMultLevel * 0.05)
+    local soulMult = 1.0 + (soulMultLevel * DataConfig.UPGRADES.soulMultiplier.valuePerLevel)
 
     local rebirthMult  = 1 + ((profile.rebirthCount or 0) * 0.15)
     local ascensionMult = 1 + ((profile.ascensionCount or 0) * 4.0)
@@ -95,7 +97,16 @@ local function _getSoulsReward(player, profile)
         zoneMult = zoneData.multiplier
     end
 
-    return math.max(1, math.floor((base + upgradeBonus) * soulMult * rebirthMult * ascensionMult * spiritMult * zoneMult))
+    -- GamePass multiplier (Soul Harvester = 2x)
+    local gamePassMult = 1.0
+    if ShopService.hasEffect(player, "soul_2x") then
+        gamePassMult = 2.0
+    end
+
+    -- Active boost multiplier (dev products: 2x/5x Soul Boost)
+    local boostMult = ShopService.getBoostMultiplier(player)
+
+    return math.max(1, math.floor((base + upgradeBonus) * soulMult * rebirthMult * ascensionMult * spiritMult * zoneMult * gamePassMult * boostMult))
 end
 
 -- Core click handler

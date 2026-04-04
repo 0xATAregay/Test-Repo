@@ -256,9 +256,9 @@ function UIController.initialize(initialData)
         UIController.setAll(initialData.currencies)
     end
 
-    _upgrades = initialData.upgrades or {}
-    _spirits = initialData.spirits or {}
-    _equippedSpirits = initialData.equippedSpirits or {}
+    _upgrades = initialData and initialData.upgrades or {}
+    _spirits = initialData and initialData.spirits or {}
+    _equippedSpirits = initialData and initialData.equippedSpirits or {}
 
     UIController.wireEvents()
     print("[UIController] Initialised.")

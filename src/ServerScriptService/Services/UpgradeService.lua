@@ -10,52 +10,53 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RemoteEvents      = require(ReplicatedStorage.Shared.Events.RemoteEvents)
 local PlayerDataService = require(script.Parent.PlayerDataService)
 local QuestService      = require(script.Parent.QuestService)
+local DataConfig        = require(ReplicatedStorage.Shared.Modules.DataConfig)
 
 local UpgradeService = {}
 
--- Upgrade catalogue
+-- Upgrade catalogue: display metadata here, balance values from DataConfig (single source of truth)
 local CATALOGUE = {
     clickPower = {
         displayName    = "Click Power",
         description    = "Increases souls earned per click.",
-        baseCost       = 100,
-        costMultiplier = 1.15,
-        baseValue      = 10,
-        valuePerLevel  = 8,
-        maxLevel       = 100,
+        baseCost       = DataConfig.UPGRADES.swingDamage.baseCost,
+        costMultiplier = DataConfig.UPGRADES.swingDamage.costMultiplier,
+        baseValue      = DataConfig.UPGRADES.swingDamage.baseValue,
+        valuePerLevel  = DataConfig.UPGRADES.swingDamage.valuePerLevel,
+        maxLevel       = DataConfig.UPGRADES.swingDamage.maxLevel,
         statKey        = "swingDamage",
         currency       = "souls",
     },
     clickSpeed = {
         displayName    = "Click Speed",
         description    = "Reduces the cooldown between clicks.",
-        baseCost       = 200,
-        costMultiplier = 1.15,
-        baseValue      = 0.20,
-        valuePerLevel  = -0.001,
-        maxLevel       = 50,
+        baseCost       = DataConfig.UPGRADES.swingSpeed.baseCost,
+        costMultiplier = DataConfig.UPGRADES.swingSpeed.costMultiplier,
+        baseValue      = DataConfig.UPGRADES.swingSpeed.baseValue,
+        valuePerLevel  = DataConfig.UPGRADES.swingSpeed.valuePerLevel,
+        maxLevel       = DataConfig.UPGRADES.swingSpeed.maxLevel,
         statKey        = "swingSpeed",
         currency       = "souls",
     },
     soulMultiplier = {
         displayName    = "Soul Multiplier",
         description    = "Multiplies all soul income.",
-        baseCost       = 500,
-        costMultiplier = 1.15,
-        baseValue      = 1.0,
-        valuePerLevel  = 0.05,
-        maxLevel       = 200,
+        baseCost       = DataConfig.UPGRADES.soulMultiplier.baseCost,
+        costMultiplier = DataConfig.UPGRADES.soulMultiplier.costMultiplier,
+        baseValue      = DataConfig.UPGRADES.soulMultiplier.baseValue,
+        valuePerLevel  = DataConfig.UPGRADES.soulMultiplier.valuePerLevel,
+        maxLevel       = DataConfig.UPGRADES.soulMultiplier.maxLevel,
         statKey        = "soulMultiplier",
         currency       = "souls",
     },
     gemFindChance = {
         displayName    = "Gem Finder",
         description    = "Increases the chance of finding a gem per click.",
-        baseCost       = 1000,
-        costMultiplier = 1.15,
-        baseValue      = 0.01,
-        valuePerLevel  = 0.005,
-        maxLevel       = 100,
+        baseCost       = DataConfig.UPGRADES.gemFindChance.baseCost,
+        costMultiplier = DataConfig.UPGRADES.gemFindChance.costMultiplier,
+        baseValue      = DataConfig.UPGRADES.gemFindChance.baseValue,
+        valuePerLevel  = DataConfig.UPGRADES.gemFindChance.valuePerLevel,
+        maxLevel       = DataConfig.UPGRADES.gemFindChance.maxLevel,
         statKey        = "gemFindChance",
         currency       = "souls",
     },

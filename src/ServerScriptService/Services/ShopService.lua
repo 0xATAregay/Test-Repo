@@ -95,7 +95,8 @@ local DEV_PRODUCTS = {
     },
 }
 
--- Track active boosts per player
+-- Active boosts are persisted in player profile (activeBoosts field).
+-- In-memory cache mirrors profile for fast reads; written back on change.
 local _activeBoosts = {} -- [userId] = { [boostType] = expiryTime }
 
 --[[
@@ -146,13 +147,27 @@ end
 function ShopService.hasActiveBoost(player, boostType)
     local userId = player.UserId
     local boosts = _activeBoosts[userId]
-    if not boosts then return false end
+    if not boosts then
+        -- Try loading from profile if not cached yet
+        local data = PlayerDataService.GetData(player)
+        if data and data.activeBoosts then
+            _activeBoosts[userId] = data.activeBoosts
+            boosts = _activeBoosts[userId]
+        end
+        if not boosts then return false end
+    end
 
     local expiry = boosts[boostType]
     if not expiry then return false end
 
     if os.time() > expiry then
         boosts[boostType] = nil
+        -- Persist expiry cleanup to profile
+        PlayerDataService.UpdateData(player, function(d)
+            if d.activeBoosts then
+                d.activeBoosts[boostType] = nil
+            end
+        end)
         return false
     end
 
@@ -219,7 +234,20 @@ local function processReceipt(receiptInfo)
         end
 
         local currentExpiry = _activeBoosts[userId][productConfig.boostType] or os.time()
-        _activeBoosts[userId][productConfig.boostType] = math.max(currentExpiry, os.time()) + productConfig.duration
+        local newExpiry = math.max(currentExpiry, os.time()) + productConfig.duration
+        _activeBoosts[userId][productConfig.boostType] = newExpiry
+
+        -- Persist boost to player profile so it survives disconnect/restart
+        local saved = PlayerDataService.UpdateData(player, function(d)
+            if not d.activeBoosts then d.activeBoosts = {} end
+            d.activeBoosts[productConfig.boostType] = newExpiry
+        end)
+
+        if not saved then
+            -- Data save failed — don't grant yet so receipt is retried
+            _activeBoosts[userId][productConfig.boostType] = nil
+            return Enum.ProductPurchaseDecision.NotProcessedYet
+        end
 
         RemoteEvents.ProcessDevProduct:FireClient(player, {
             success = true,
@@ -278,11 +306,11 @@ function ShopService.init()
         end
     end)
 
-    -- Clean up on player leave
+    -- Clean up caches on player leave (boost data is persisted in profile)
     Players.PlayerRemoving:Connect(function(player)
         local userId = player.UserId
         _gamePassCache[userId] = nil
-        _activeBoosts[userId] = nil
+        _activeBoosts[userId] = nil  -- clear cache only; data is in profile
     end)
 
     print("[ShopService] Initialised.")

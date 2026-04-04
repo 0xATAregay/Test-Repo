@@ -53,6 +53,9 @@ DataConfig.DEFAULT_PROFILE = {
     dailyRewardIndex = 0,   -- which day in the 7-day cycle they're on
     dailyRewardClaimed = false,
 
+    -- Active boosts (persisted so paid boosts survive disconnect/restart)
+    activeBoosts = {},  -- { [boostType] = expiryTimestamp }
+
     -- Settings
     settings = {
         sfxEnabled = true,

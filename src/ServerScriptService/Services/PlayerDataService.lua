@@ -77,6 +77,9 @@ local DATA_TEMPLATE = {
     dailyRewardIndex    = 0,
     dailyRewardClaimed  = false,
 
+    -- Active boosts (persisted so paid boosts survive disconnect/restart)
+    activeBoosts = {},  -- { [boostType] = expiryTimestamp }
+
     -- Settings
     settings = {
         sfxEnabled           = true,
