@@ -1,59 +1,40 @@
-# Questbound
+# Questbound Ascension
 
-Questbound is a lightweight, single-page productivity RPG for turning concrete tasks into quests. It is designed to stay readable, calm, and fast: no account, no backend, and no build step.
+Questbound turns a task list into a focused, local-first RPG command deck. Create quests, earn XP and Gold, build streaks, run distraction-light focus sprints, and exchange Gold for real-world rewards you define yourself.
 
-## Features
+## Highlights
 
-- Four quest difficulties: Easy, Medium, Hard, and Boss
-- Editable username and custom profile picture with local square-cropping and compression
-- XP-based leveling with increasingly larger milestones
-- Gold rewards and a custom real-life reward shop
-- Daily streaks with an XP multiplier up to 1.5×
-- Focus Energy that recovers when quests are completed
-- Confetti, short synthesized reward tones, and a sound toggle
-- A looping background-music player for user-selected MP3, WAV, OGG, M4A, AAC, or WebM files
-- Active, cleared, and combined quest views
-- Recent victory history
-- LocalStorage and IndexedDB persistence with validation and safe fallbacks
-- Keyboard-friendly controls, semantic markup, live announcements, and reduced-motion support
-- Responsive dark retro-RPG interface
+- Four quest classes from quick wins to 100 XP boss battles
+- Level, rank, streak, energy, Gold, achievements, and weekly momentum systems
+- Prime directive targeting, categories, priorities, filters, and search
+- 5, 15, 25, and 50 minute focus protocols with session rewards
+- Repeatable daily rituals and a custom reward Tavern
+- Editable username and compressed local profile photo
+- Device-local soundtrack player for MP3, WAV, OGG, M4A, AAC, or WebM files
+- Mint, violet, and amber interface signals with optional reduced effects
+- JSON save export/import and automatic migration from the original dashboard
+- Responsive desktop, tablet, and mobile layouts
 
-## File structure
+## Privacy and persistence
 
-```text
-index.html   Semantic page structure, Tailwind CDN configuration, and UI shell
-styles.css   Retro theme, responsive layouts, effects, and accessibility styles
-script.js    State model, game rules, persistence, rendering, and interactions
-README.md    Project documentation
-```
+Campaign data is stored in browser `localStorage`. Profile photos are compressed before storage, while music is kept in IndexedDB. Nothing is uploaded to Questbound or committed to GitHub. Clearing browser site data removes the local campaign unless it has first been exported from Settings.
 
-## Run locally
+Only load audio you have the right to use. Browsers require an initial user action before music can play.
 
-No installation is required. Open `index.html` directly, or serve the directory with any static server:
+## Development
+
+Requires Node.js 22.13 or newer.
 
 ```bash
-python3 -m http.server 8080
+npm ci
+npm run dev
 ```
 
-Then open `http://localhost:8080`.
+Useful checks:
 
-## Gameplay rules
+```bash
+npm run lint
+npm test
+```
 
-| Difficulty | Base XP | Gold | Energy restored |
-| --- | ---: | ---: | ---: |
-| Easy | 10 | 2 | 4 |
-| Medium | 25 | 5 | 6 |
-| Hard | 50 | 10 | 9 |
-| Boss | 100 | 20 | 14 |
-
-Completing at least one quest on consecutive calendar days increases the XP multiplier by 0.1× per day, capped at 1.5×. XP advances levels; Gold is the spendable reward currency.
-
-## Data and privacy
-
-Game data, including the compressed profile picture, is stored under the `questbound-rpg-v1` LocalStorage key in the current browser. A user-selected background track is stored separately in the browser's `questbound-media-v1` IndexedDB database so larger audio files do not overload LocalStorage. Nothing is transmitted to a server or committed to GitHub. Clearing browser storage or using **Reset game data** permanently removes the local save and track.
-
-Browsers require a user interaction before audio can begin. If a saved track cannot resume automatically after refresh, selecting **Play** in the music panel starts it.
-
-## Browser support
-
-Questbound targets current versions of Chrome, Edge, Firefox, and Safari. Tailwind CSS is loaded through its browser CDN as requested, so the first page load requires an internet connection. The custom stylesheet and application logic remain dependency-free.
+The application is built with React 19, TypeScript, Vinext, Vite, and Cloudflare Workers. It intentionally needs no backend or account system.
