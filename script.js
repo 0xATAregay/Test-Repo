@@ -5,6 +5,9 @@
   const STATE_VERSION = 1;
   const MAX_ENERGY = 100;
   const MAX_ACTIVITY_ITEMS = 30;
+  const MAX_PROFILE_FILE_BYTES = 8 * 1024 * 1024;
+  const MAX_PROFILE_DATA_URL_LENGTH = 1_000_000;
+  const PROFILE_IMAGE_SIZE = 384;
 
   const DIFFICULTIES = Object.freeze({
     easy: Object.freeze({ label: "Easy", xp: 10, gold: 2, energy: 4 }),
@@ -48,6 +51,8 @@
   let storageWriteFailed = false;
   let questFilter = "active";
   let pendingConfirmAction = null;
+  let profileDraftAvatar = null;
+  let profileImageRequestId = 0;
   let audioContext = null;
   let state = loadState();
 
@@ -58,6 +63,11 @@
     soundOnIcon: getById("sound-on-icon"),
     soundOffIcon: getById("sound-off-icon"),
     todayLabel: getById("today-label"),
+    playerHeading: getById("player-heading"),
+    profileEditTrigger: getById("profile-edit-trigger"),
+    profileNameEdit: getById("profile-name-edit"),
+    profileAvatarImage: getById("profile-avatar-image"),
+    defaultAvatar: getById("default-avatar"),
     avatarLevel: getById("avatar-level"),
     levelValue: getById("level-value"),
     rankValue: getById("rank-value"),
@@ -91,6 +101,16 @@
     confettiLayer: getById("confetti-layer"),
     toastRegion: getById("toast-region"),
     announcer: getById("screen-reader-announcer"),
+    profileDialog: getById("profile-dialog"),
+    profileForm: getById("profile-form"),
+    profileDialogClose: getById("profile-dialog-close"),
+    profileName: getById("profile-name"),
+    profileImageInput: getById("profile-image-input"),
+    profileImageSelect: getById("profile-image-select"),
+    profileImageRemove: getById("profile-image-remove"),
+    profilePreviewImage: getById("profile-preview-image"),
+    profilePreviewDefault: getById("profile-preview-default"),
+    profileCancel: getById("profile-cancel"),
     confirmDialog: getById("confirm-dialog"),
     confirmTitle: getById("confirm-title"),
     confirmCopy: getById("confirm-copy"),
@@ -114,6 +134,8 @@
     return {
       version: STATE_VERSION,
       player: {
+        profileName: "Pixel Hero",
+        avatarDataUrl: null,
         totalXp: 0,
         gold: 0,
         energy: MAX_ENERGY,
@@ -152,6 +174,8 @@
     return {
       version: STATE_VERSION,
       player: {
+        profileName: normalizeText(player.profileName, 24) || "Pixel Hero",
+        avatarDataUrl: sanitizeAvatarDataUrl(player.avatarDataUrl),
         totalXp: safeInteger(player.totalXp, 0, 1_000_000_000, 0),
         gold: safeInteger(player.gold, 0, 1_000_000_000, 0),
         energy: safeInteger(player.energy, 0, MAX_ENERGY, MAX_ENERGY),
@@ -263,6 +287,12 @@
     return value.trim().replace(/\s+/g, " ").slice(0, maximumLength);
   }
 
+  function sanitizeAvatarDataUrl(value) {
+    if (typeof value !== "string" || value.length > MAX_PROFILE_DATA_URL_LENGTH) return null;
+    if (!/^data:image\/(?:png|jpeg|webp);base64,[a-z0-9+/=]+$/i.test(value)) return null;
+    return value;
+  }
+
   function isDateKey(value) {
     return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value);
   }
@@ -296,6 +326,26 @@
     refs.rewardList.addEventListener("click", handleRewardListClick);
     refs.soundToggle.addEventListener("click", toggleSound);
     refs.resetDataButton.addEventListener("click", requestReset);
+    refs.profileEditTrigger.addEventListener("click", openProfileEditor);
+    refs.profileNameEdit.addEventListener("click", openProfileEditor);
+    refs.profileForm.addEventListener("submit", handleProfileSubmit);
+    refs.profileImageSelect.addEventListener("click", () => refs.profileImageInput.click());
+    refs.profileImageInput.addEventListener("change", handleProfileImageChange);
+    refs.profileImageRemove.addEventListener("click", removeProfileImageDraft);
+    refs.profileCancel.addEventListener("click", closeProfileEditor);
+    refs.profileDialogClose.addEventListener("click", closeProfileEditor);
+
+    refs.profileDialog.addEventListener("click", (event) => {
+      if (event.target === refs.profileDialog) closeProfileEditor();
+    });
+
+    refs.profileDialog.addEventListener("close", () => {
+      profileImageRequestId += 1;
+      profileDraftAvatar = state.player.avatarDataUrl;
+      refs.profileImageInput.value = "";
+      refs.profileImageSelect.disabled = false;
+      refs.profileImageSelect.textContent = "Choose photo";
+    });
 
     document.querySelectorAll(".quest-filter").forEach((button) => {
       button.addEventListener("click", () => setQuestFilter(button.dataset.filter));
@@ -346,6 +396,173 @@
     }
 
     if (changed) persistState();
+  }
+
+  function openProfileEditor() {
+    profileImageRequestId += 1;
+    profileDraftAvatar = state.player.avatarDataUrl;
+    refs.profileName.value = state.player.profileName;
+    refs.profileImageInput.value = "";
+    refs.profileImageSelect.disabled = false;
+    refs.profileImageSelect.textContent = "Choose photo";
+    renderProfilePreview();
+    refs.profileDialog.showModal();
+    window.setTimeout(() => refs.profileName.select(), 40);
+  }
+
+  function closeProfileEditor() {
+    if (refs.profileDialog.open) refs.profileDialog.close();
+  }
+
+  function handleProfileSubmit(event) {
+    event.preventDefault();
+
+    if (refs.profileImageSelect.disabled) {
+      showToast("Photo is still processing", "Give it another second, then save the profile.", "error");
+      return;
+    }
+
+    const profileName = normalizeText(refs.profileName.value, 24);
+    if (!profileName) {
+      refs.profileName.focus();
+      showToast("Enter a username", "Your character needs at least one visible character.", "error");
+      return;
+    }
+
+    state.player.profileName = profileName;
+    state.player.avatarDataUrl = sanitizeAvatarDataUrl(profileDraftAvatar);
+    persistState();
+    renderProfile();
+    closeProfileEditor();
+    announce(`Profile saved as ${profileName}.`);
+    showToast("Profile saved", state.player.avatarDataUrl ? "Username and profile picture updated." : "Username updated.", "success");
+  }
+
+  async function handleProfileImageChange(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const requestId = ++profileImageRequestId;
+    refs.profileImageSelect.disabled = true;
+    refs.profileImageSelect.textContent = "Processing…";
+
+    try {
+      const avatarDataUrl = await cropAndCompressProfileImage(file);
+      if (requestId !== profileImageRequestId) return;
+      profileDraftAvatar = avatarDataUrl;
+      renderProfilePreview();
+      showToast("Photo ready", "It has been cropped and compressed. Save the profile to keep it.", "success");
+    } catch (error) {
+      if (requestId !== profileImageRequestId) return;
+      showToast("Could not use that photo", error instanceof Error ? error.message : "Choose a PNG, JPEG, WebP, or GIF image.", "error");
+    } finally {
+      if (requestId === profileImageRequestId) {
+        refs.profileImageInput.value = "";
+        refs.profileImageSelect.disabled = false;
+        refs.profileImageSelect.textContent = "Choose photo";
+      }
+    }
+  }
+
+  function removeProfileImageDraft() {
+    profileImageRequestId += 1;
+    profileDraftAvatar = null;
+    refs.profileImageInput.value = "";
+    refs.profileImageSelect.disabled = false;
+    refs.profileImageSelect.textContent = "Choose photo";
+    renderProfilePreview();
+  }
+
+  function renderProfilePreview() {
+    const hasCustomAvatar = Boolean(profileDraftAvatar);
+    refs.profilePreviewImage.classList.toggle("hidden", !hasCustomAvatar);
+    refs.profilePreviewDefault.classList.toggle("hidden", hasCustomAvatar);
+    refs.profileImageRemove.disabled = !hasCustomAvatar;
+
+    if (hasCustomAvatar) {
+      refs.profilePreviewImage.src = profileDraftAvatar;
+    } else {
+      refs.profilePreviewImage.removeAttribute("src");
+    }
+  }
+
+  function cropAndCompressProfileImage(file) {
+    const supportedTypes = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);
+    if (!supportedTypes.has(file.type)) {
+      return Promise.reject(new Error("Choose a PNG, JPEG, WebP, or GIF image."));
+    }
+    if (file.size > MAX_PROFILE_FILE_BYTES) {
+      return Promise.reject(new Error("That file is over 8 MB. Choose a smaller photo."));
+    }
+
+    return new Promise((resolve, reject) => {
+      const objectUrl = URL.createObjectURL(file);
+      const image = new Image();
+
+      const cleanUp = () => URL.revokeObjectURL(objectUrl);
+      image.onerror = () => {
+        cleanUp();
+        reject(new Error("The image could not be decoded. Try a different file."));
+      };
+
+      image.onload = () => {
+        try {
+          const sourceWidth = image.naturalWidth;
+          const sourceHeight = image.naturalHeight;
+          if (!sourceWidth || !sourceHeight) throw new Error("The image has invalid dimensions.");
+
+          const sourceSize = Math.min(sourceWidth, sourceHeight);
+          const sourceX = Math.floor((sourceWidth - sourceSize) / 2);
+          const sourceY = Math.floor((sourceHeight - sourceSize) / 2);
+          const outputSizes = [PROFILE_IMAGE_SIZE, 320, 256];
+          let lastResult = null;
+
+          for (const outputSize of outputSizes) {
+            const canvas = document.createElement("canvas");
+            canvas.width = outputSize;
+            canvas.height = outputSize;
+            const context = canvas.getContext("2d", { alpha: false });
+            if (!context) throw new Error("This browser could not prepare the image.");
+
+            context.fillStyle = "#111522";
+            context.fillRect(0, 0, outputSize, outputSize);
+            context.imageSmoothingEnabled = true;
+            context.imageSmoothingQuality = "high";
+            context.drawImage(
+              image,
+              sourceX,
+              sourceY,
+              sourceSize,
+              sourceSize,
+              0,
+              0,
+              outputSize,
+              outputSize,
+            );
+
+            let dataUrl = canvas.toDataURL("image/webp", 0.82);
+            if (!dataUrl.startsWith("data:image/webp")) {
+              dataUrl = canvas.toDataURL("image/jpeg", 0.84);
+            }
+            lastResult = dataUrl;
+            if (dataUrl.length <= MAX_PROFILE_DATA_URL_LENGTH) {
+              cleanUp();
+              resolve(dataUrl);
+              return;
+            }
+          }
+
+          cleanUp();
+          if (!lastResult) throw new Error("The image could not be processed.");
+          reject(new Error("The processed photo is still too large. Try a simpler image."));
+        } catch (error) {
+          cleanUp();
+          reject(error instanceof Error ? error : new Error("The image could not be processed."));
+        }
+      };
+
+      image.src = objectUrl;
+    });
   }
 
   function handleQuestSubmit(event) {
@@ -635,6 +852,7 @@
 
   function render() {
     renderDate();
+    renderProfile();
     renderStats();
     renderQuestFilters();
     renderQuests();
@@ -645,6 +863,23 @@
 
   function renderDate() {
     refs.todayLabel.textContent = fullTodayFormatter.format(new Date());
+  }
+
+  function renderProfile() {
+    const profileName = state.player.profileName || "Pixel Hero";
+    const hasCustomAvatar = Boolean(state.player.avatarDataUrl);
+
+    refs.playerHeading.textContent = profileName;
+    refs.profileEditTrigger.setAttribute("aria-label", `Edit ${profileName} profile`);
+    refs.profileNameEdit.setAttribute("aria-label", `Edit ${profileName} username and profile picture`);
+    refs.profileAvatarImage.classList.toggle("hidden", !hasCustomAvatar);
+    refs.defaultAvatar.classList.toggle("hidden", hasCustomAvatar);
+
+    if (hasCustomAvatar) {
+      refs.profileAvatarImage.src = state.player.avatarDataUrl;
+    } else {
+      refs.profileAvatarImage.removeAttribute("src");
+    }
   }
 
   function renderStats() {

@@ -92,8 +92,15 @@
         <section id="top" class="pixel-card hero-panel overflow-hidden p-4 sm:p-6" aria-labelledby="player-heading">
           <div class="grid gap-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(420px,0.85fr)] lg:items-center">
             <div class="flex min-w-0 items-center gap-4 sm:gap-6">
-              <div class="avatar-shell shrink-0" aria-hidden="true">
-                <svg class="pixel-avatar" viewBox="0 0 64 64" role="img" aria-label="Pixel hero avatar">
+              <button
+                id="profile-edit-trigger"
+                class="avatar-shell shrink-0"
+                type="button"
+                aria-label="Edit Pixel Hero profile"
+                title="Edit profile"
+              >
+                <img id="profile-avatar-image" class="profile-avatar-image hidden" alt="" />
+                <svg id="default-avatar" class="pixel-avatar" viewBox="0 0 64 64" aria-hidden="true">
                   <rect x="20" y="4" width="24" height="4" class="pixel-hair" />
                   <rect x="16" y="8" width="32" height="12" class="pixel-hair" />
                   <rect x="12" y="12" width="8" height="16" class="pixel-hair" />
@@ -110,15 +117,35 @@
                   <rect x="36" y="52" width="8" height="8" class="pixel-boot" />
                 </svg>
                 <span id="avatar-level" class="avatar-shell__level">LV 1</span>
-              </div>
+                <span class="avatar-shell__edit" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none">
+                    <path d="m4 16-.8 4.8L8 20l10.7-10.7-4-4L4 16Z" />
+                    <path d="m13.5 6.5 4 4" />
+                  </svg>
+                </span>
+              </button>
 
               <div class="min-w-0 flex-1">
                 <p id="today-label" class="mb-2 text-[11px] font-bold uppercase tracking-[0.2em] text-mint">
                   Today's campaign
                 </p>
-                <h1 id="player-heading" class="text-2xl font-black tracking-tight text-white sm:text-4xl">
-                  Pixel Hero
-                </h1>
+                <div class="flex min-w-0 items-center gap-2">
+                  <h1 id="player-heading" class="truncate text-2xl font-black tracking-tight text-white sm:text-4xl">
+                    Pixel Hero
+                  </h1>
+                  <button
+                    id="profile-name-edit"
+                    class="profile-name-edit"
+                    type="button"
+                    aria-label="Edit username and profile picture"
+                    title="Edit profile"
+                  >
+                    <svg aria-hidden="true" viewBox="0 0 24 24" fill="none">
+                      <path d="m4 16-.8 4.8L8 20l10.7-10.7-4-4L4 16Z" />
+                      <path d="m13.5 6.5 4 4" />
+                    </svg>
+                  </button>
+                </div>
                 <p class="mt-2 max-w-xl text-sm leading-6 text-slate-400">
                   Pick one quest. Make the next move obvious. Collect the loot.
                 </p>
@@ -340,6 +367,80 @@
     <div id="confetti-layer" class="confetti-layer" aria-hidden="true"></div>
     <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
     <p id="screen-reader-announcer" class="sr-only" aria-live="assertive"></p>
+
+    <dialog id="profile-dialog" class="profile-dialog" aria-labelledby="profile-dialog-title">
+      <form id="profile-form" class="profile-dialog__panel" autocomplete="off">
+        <div class="flex items-start justify-between gap-4 text-left">
+          <div>
+            <p class="section-kicker">Character settings</p>
+            <h2 id="profile-dialog-title" class="text-xl font-black text-white">Edit profile</h2>
+          </div>
+          <button id="profile-dialog-close" class="profile-dialog__close" type="button" aria-label="Close profile editor">
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="none">
+              <path d="m6 6 12 12M18 6 6 18" />
+            </svg>
+          </button>
+        </div>
+
+        <div class="profile-editor mt-6">
+          <div class="profile-preview" role="img" aria-label="Profile picture preview">
+            <img id="profile-preview-image" class="profile-preview__image hidden" alt="" />
+            <svg id="profile-preview-default" class="profile-preview__pixel" viewBox="0 0 64 64" aria-hidden="true">
+              <rect x="20" y="4" width="24" height="4" class="pixel-hair" />
+              <rect x="16" y="8" width="32" height="12" class="pixel-hair" />
+              <rect x="12" y="12" width="8" height="16" class="pixel-hair" />
+              <rect x="44" y="12" width="8" height="16" class="pixel-hair" />
+              <rect x="20" y="16" width="24" height="16" class="pixel-skin" />
+              <rect x="24" y="20" width="4" height="4" class="pixel-eye" />
+              <rect x="36" y="20" width="4" height="4" class="pixel-eye" />
+              <rect x="28" y="28" width="8" height="4" class="pixel-shadow" />
+              <rect x="16" y="32" width="32" height="20" class="pixel-armor" />
+              <rect x="12" y="36" width="8" height="16" class="pixel-armor-dark" />
+              <rect x="44" y="36" width="8" height="16" class="pixel-armor-dark" />
+              <rect x="28" y="34" width="8" height="12" class="pixel-emblem" />
+              <rect x="20" y="52" width="8" height="8" class="pixel-boot" />
+              <rect x="36" y="52" width="8" height="8" class="pixel-boot" />
+            </svg>
+          </div>
+
+          <div class="min-w-0 flex-1">
+            <label class="profile-field-label" for="profile-name">Username</label>
+            <input
+              id="profile-name"
+              class="field-input mt-2"
+              name="profileName"
+              type="text"
+              maxlength="24"
+              placeholder="Pixel Hero"
+              required
+            />
+            <p class="mt-2 text-[10px] leading-5 text-slate-600">1–24 characters. This name only appears on your dashboard.</p>
+
+            <input
+              id="profile-image-input"
+              class="hidden"
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/gif"
+            />
+            <div class="mt-4 flex flex-wrap gap-2">
+              <button id="profile-image-select" class="secondary-button" type="button">Choose photo</button>
+              <button id="profile-image-remove" class="text-button profile-remove-button" type="button">
+                Use pixel hero
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <p class="profile-privacy-note mt-5">
+          Images are square-cropped, compressed, and stored only in this browser. Nothing is uploaded anywhere.
+        </p>
+
+        <div class="mt-6 grid grid-cols-2 gap-3">
+          <button id="profile-cancel" class="secondary-button justify-center" type="button">Cancel</button>
+          <button class="primary-button justify-center" type="submit">Save profile</button>
+        </div>
+      </form>
+    </dialog>
 
     <dialog id="confirm-dialog" class="confirm-dialog">
       <form method="dialog" class="confirm-dialog__panel">

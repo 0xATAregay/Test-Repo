@@ -5,6 +5,7 @@ Questbound is a lightweight, single-page productivity RPG for turning concrete t
 ## Features
 
 - Four quest difficulties: Easy, Medium, Hard, and Boss
+- Editable username and custom profile picture with local square-cropping and compression
 - XP-based leveling with increasingly larger milestones
 - Gold rewards and a custom real-life reward shop
 - Daily streaks with an XP multiplier up to 1.5×
@@ -48,7 +49,7 @@ Completing at least one quest on consecutive calendar days increases the XP mult
 
 ## Data and privacy
 
-All game data is stored under the `questbound-rpg-v1` LocalStorage key in the current browser. Nothing is transmitted to a server. Clearing browser storage or using **Reset game data** permanently removes the local save.
+All game data, including the compressed profile picture, is stored under the `questbound-rpg-v1` LocalStorage key in the current browser. Nothing is transmitted to a server. Clearing browser storage or using **Reset game data** permanently removes the local save.
 
 ## Browser support
 
