@@ -8,6 +8,10 @@
   const MAX_PROFILE_FILE_BYTES = 8 * 1024 * 1024;
   const MAX_PROFILE_DATA_URL_LENGTH = 1_000_000;
   const PROFILE_IMAGE_SIZE = 384;
+  const MEDIA_DATABASE_NAME = "questbound-media-v1";
+  const MEDIA_STORE_NAME = "media";
+  const BACKGROUND_MUSIC_KEY = "background-track";
+  const MAX_AUDIO_FILE_BYTES = 30 * 1024 * 1024;
 
   const DIFFICULTIES = Object.freeze({
     easy: Object.freeze({ label: "Easy", xp: 10, gold: 2, energy: 4 }),
@@ -54,6 +58,12 @@
   let profileDraftAvatar = null;
   let profileImageRequestId = 0;
   let audioContext = null;
+  let backgroundTrack = null;
+  let musicObjectUrl = null;
+  let musicFileBusy = false;
+  let musicStorageGeneration = 0;
+  let musicResumeArmed = false;
+  let musicResumeHandler = null;
   let state = loadState();
 
   const getById = (id) => document.getElementById(id);
@@ -62,6 +72,21 @@
     soundToggle: getById("sound-toggle"),
     soundOnIcon: getById("sound-on-icon"),
     soundOffIcon: getById("sound-off-icon"),
+    musicControl: getById("music-control"),
+    backgroundMusic: getById("background-music"),
+    musicDialog: getById("music-dialog"),
+    musicDialogClose: getById("music-dialog-close"),
+    musicVisualizer: getById("music-visualizer"),
+    musicTrackStatus: getById("music-track-status"),
+    musicTrackName: getById("music-track-name"),
+    musicPlayToggle: getById("music-play-toggle"),
+    musicPlayIcon: getById("music-play-icon"),
+    musicPauseIcon: getById("music-pause-icon"),
+    musicVolume: getById("music-volume"),
+    musicVolumeValue: getById("music-volume-value"),
+    musicFileInput: getById("music-file-input"),
+    musicFileSelect: getById("music-file-select"),
+    musicFileRemove: getById("music-file-remove"),
     todayLabel: getById("today-label"),
     playerHeading: getById("player-heading"),
     profileEditTrigger: getById("profile-edit-trigger"),
@@ -124,6 +149,7 @@
     applyDailyStateCheck();
     bindEvents();
     render();
+    void initializeBackgroundMusic();
 
     if (storageLoadFailed) {
       showToast("Save data could not be read", "A fresh game was loaded. Browser storage may be unavailable.", "error");
@@ -146,6 +172,8 @@
       },
       settings: {
         soundEnabled: true,
+        musicVolume: 0.35,
+        musicShouldPlay: false,
       },
       quests: [],
       rewards: [],
@@ -186,6 +214,8 @@
       },
       settings: {
         soundEnabled: settings.soundEnabled !== false,
+        musicVolume: safeNumber(settings.musicVolume, 0, 1, 0.35),
+        musicShouldPlay: settings.musicShouldPlay === true,
       },
       quests: sanitizeQuests(candidate.quests),
       rewards: sanitizeRewards(candidate.rewards),
@@ -325,6 +355,17 @@
     refs.questList.addEventListener("click", handleQuestListClick);
     refs.rewardList.addEventListener("click", handleRewardListClick);
     refs.soundToggle.addEventListener("click", toggleSound);
+    refs.musicControl.addEventListener("click", openMusicPlayer);
+    refs.musicDialogClose.addEventListener("click", closeMusicPlayer);
+    refs.musicPlayToggle.addEventListener("click", toggleBackgroundMusic);
+    refs.musicFileSelect.addEventListener("click", () => refs.musicFileInput.click());
+    refs.musicFileInput.addEventListener("change", handleMusicFileChange);
+    refs.musicFileRemove.addEventListener("click", requestMusicRemoval);
+    refs.musicVolume.addEventListener("input", handleMusicVolumeInput);
+    refs.musicVolume.addEventListener("change", persistMusicVolume);
+    refs.backgroundMusic.addEventListener("play", renderMusicPlayer);
+    refs.backgroundMusic.addEventListener("pause", renderMusicPlayer);
+    refs.backgroundMusic.addEventListener("error", handleMusicPlaybackError);
     refs.resetDataButton.addEventListener("click", requestReset);
     refs.profileEditTrigger.addEventListener("click", openProfileEditor);
     refs.profileNameEdit.addEventListener("click", openProfileEditor);
@@ -345,6 +386,10 @@
       refs.profileImageInput.value = "";
       refs.profileImageSelect.disabled = false;
       refs.profileImageSelect.textContent = "Choose photo";
+    });
+
+    refs.musicDialog.addEventListener("click", (event) => {
+      if (event.target === refs.musicDialog) closeMusicPlayer();
     });
 
     document.querySelectorAll(".quest-filter").forEach((button) => {
@@ -562,6 +607,375 @@
       };
 
       image.src = objectUrl;
+    });
+  }
+
+  async function initializeBackgroundMusic() {
+    const requestGeneration = musicStorageGeneration;
+    refs.backgroundMusic.volume = state.settings.musicVolume;
+    renderMusicPlayer();
+
+    try {
+      const storedTrack = await readStoredBackgroundMusic();
+      if (requestGeneration !== musicStorageGeneration) return;
+      if (!storedTrack) {
+        if (state.settings.musicShouldPlay) {
+          state.settings.musicShouldPlay = false;
+          persistState();
+        }
+        renderMusicPlayer();
+        return;
+      }
+
+      attachBackgroundMusic(storedTrack);
+      renderMusicPlayer();
+
+      if (state.settings.musicShouldPlay) {
+        const started = await startBackgroundMusic({ notifyOnFailure: false });
+        if (!started) armMusicResumeOnInteraction();
+      }
+    } catch (error) {
+      if (requestGeneration !== musicStorageGeneration) return;
+      backgroundTrack = null;
+      state.settings.musicShouldPlay = false;
+      persistState();
+      renderMusicPlayer();
+      showToast("Music storage unavailable", "This browser could not open its private audio storage.", "error");
+    }
+  }
+
+  function openMusicPlayer() {
+    renderMusicPlayer();
+    refs.musicDialog.showModal();
+  }
+
+  function closeMusicPlayer() {
+    if (refs.musicDialog.open) refs.musicDialog.close();
+  }
+
+  async function handleMusicFileChange(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const requestGeneration = ++musicStorageGeneration;
+    musicFileBusy = true;
+    renderMusicPlayer();
+
+    try {
+      validateAudioFile(file);
+      const track = {
+        name: normalizeText(file.name, 80) || "Background music",
+        type: file.type || "audio/mpeg",
+        size: file.size,
+        updatedAt: new Date().toISOString(),
+        blob: file,
+      };
+
+      await writeStoredBackgroundMusic(track);
+      if (requestGeneration !== musicStorageGeneration) return;
+      attachBackgroundMusic(track);
+      state.settings.musicShouldPlay = true;
+      persistState();
+      musicFileBusy = false;
+      renderMusicPlayer();
+
+      const started = await startBackgroundMusic({ notifyOnFailure: false });
+      showToast(
+        "Background track saved",
+        started ? `${track.name} is now looping.` : `${track.name} is ready. Press Play to start it.`,
+        "success",
+      );
+      announce(`Background music saved: ${track.name}.`);
+    } catch (error) {
+      showToast(
+        "Could not save that track",
+        error instanceof Error ? error.message : "Choose a supported audio file under 30 MB.",
+        "error",
+      );
+    } finally {
+      musicFileBusy = false;
+      refs.musicFileInput.value = "";
+      renderMusicPlayer();
+    }
+  }
+
+  function validateAudioFile(file) {
+    const supportedTypes = new Set([
+      "audio/mpeg",
+      "audio/mp3",
+      "audio/wav",
+      "audio/x-wav",
+      "audio/ogg",
+      "audio/mp4",
+      "audio/x-m4a",
+      "audio/aac",
+      "audio/webm",
+    ]);
+    const hasSupportedExtension = /\.(?:mp3|wav|ogg|m4a|aac|webm)$/i.test(file.name);
+
+    if (!supportedTypes.has(file.type) && !hasSupportedExtension) {
+      throw new Error("Choose an MP3, WAV, OGG, M4A, AAC, or WebM audio file.");
+    }
+    if (!file.size) throw new Error("That audio file is empty.");
+    if (file.size > MAX_AUDIO_FILE_BYTES) throw new Error("That file is over 30 MB. Choose a smaller audio file.");
+    if (file.type && refs.backgroundMusic.canPlayType(file.type) === "" && !hasSupportedExtension) {
+      throw new Error("This browser does not support that audio format.");
+    }
+  }
+
+  function attachBackgroundMusic(track) {
+    releaseMusicObjectUrl();
+    backgroundTrack = {
+      name: normalizeText(track.name, 80) || "Background music",
+      type: track.type || "audio/mpeg",
+      size: safeInteger(track.size, 0, MAX_AUDIO_FILE_BYTES, track.blob.size),
+      updatedAt: safeTimestamp(track.updatedAt),
+      blob: track.blob,
+    };
+    musicObjectUrl = URL.createObjectURL(track.blob);
+    refs.backgroundMusic.src = musicObjectUrl;
+    refs.backgroundMusic.volume = state.settings.musicVolume;
+    refs.backgroundMusic.load();
+  }
+
+  function releaseMusicObjectUrl() {
+    if (!musicObjectUrl) return;
+    URL.revokeObjectURL(musicObjectUrl);
+    musicObjectUrl = null;
+  }
+
+  async function startBackgroundMusic({ notifyOnFailure = true } = {}) {
+    if (!backgroundTrack) {
+      if (notifyOnFailure) showToast("Choose a track first", "Open the music player and select an audio file.", "error");
+      return false;
+    }
+
+    state.settings.musicShouldPlay = true;
+    persistState();
+
+    try {
+      refs.backgroundMusic.volume = state.settings.musicVolume;
+      await refs.backgroundMusic.play();
+      disarmMusicResume();
+      renderMusicPlayer();
+      return true;
+    } catch (error) {
+      armMusicResumeOnInteraction();
+      renderMusicPlayer();
+      if (notifyOnFailure) {
+        showToast("Playback needs a click", "Press Play again after interacting with the page.", "error");
+      }
+      return false;
+    }
+  }
+
+  function toggleBackgroundMusic() {
+    if (!backgroundTrack) {
+      refs.musicFileInput.click();
+      return;
+    }
+
+    if (!refs.backgroundMusic.paused) {
+      state.settings.musicShouldPlay = false;
+      persistState();
+      disarmMusicResume();
+      refs.backgroundMusic.pause();
+      renderMusicPlayer();
+      return;
+    }
+
+    void startBackgroundMusic({ notifyOnFailure: true });
+  }
+
+  function handleMusicVolumeInput() {
+    const percentage = safeInteger(refs.musicVolume.value, 0, 100, 35);
+    state.settings.musicVolume = percentage / 100;
+    refs.backgroundMusic.volume = state.settings.musicVolume;
+    renderMusicVolume();
+  }
+
+  function persistMusicVolume() {
+    handleMusicVolumeInput();
+    persistState();
+  }
+
+  function handleMusicPlaybackError() {
+    if (!backgroundTrack) return;
+    state.settings.musicShouldPlay = false;
+    persistState();
+    renderMusicPlayer();
+    showToast("Track could not play", "The file may be damaged or use a codec this browser does not support.", "error");
+  }
+
+  function requestMusicRemoval() {
+    if (!backgroundTrack) return;
+    closeMusicPlayer();
+    openConfirm({
+      title: "Remove the saved track?",
+      copy: "The local audio copy will be deleted from this browser. You can select the original file again later.",
+      confirmLabel: "Remove track",
+      tone: "danger",
+      onConfirm: () => void removeBackgroundMusic(),
+    });
+  }
+
+  async function removeBackgroundMusic({ silent = false } = {}) {
+    const requestGeneration = ++musicStorageGeneration;
+    try {
+      await deleteStoredBackgroundMusic();
+    } catch (error) {
+      if (!silent) showToast("Could not remove the track", "Browser storage refused the deletion. Try again.", "error");
+      return false;
+    }
+    if (requestGeneration !== musicStorageGeneration) return false;
+
+    disarmMusicResume();
+    state.settings.musicShouldPlay = false;
+    backgroundTrack = null;
+    refs.backgroundMusic.pause();
+    refs.backgroundMusic.removeAttribute("src");
+    refs.backgroundMusic.load();
+    releaseMusicObjectUrl();
+    persistState();
+    renderMusicPlayer();
+
+    if (!silent) {
+      showToast("Background track removed", "The audio file was deleted from this browser.", "default");
+      announce("Background music removed.");
+    }
+    return true;
+  }
+
+  function armMusicResumeOnInteraction() {
+    if (musicResumeArmed || !state.settings.musicShouldPlay || !backgroundTrack) return;
+    musicResumeArmed = true;
+    musicResumeHandler = () => {
+      disarmMusicResume();
+      if (state.settings.musicShouldPlay && backgroundTrack && refs.backgroundMusic.paused) {
+        void startBackgroundMusic({ notifyOnFailure: false });
+      }
+    };
+    document.addEventListener("pointerdown", musicResumeHandler, { capture: true, once: true });
+    document.addEventListener("keydown", musicResumeHandler, { capture: true, once: true });
+  }
+
+  function disarmMusicResume() {
+    if (!musicResumeArmed || !musicResumeHandler) return;
+    document.removeEventListener("pointerdown", musicResumeHandler, true);
+    document.removeEventListener("keydown", musicResumeHandler, true);
+    musicResumeArmed = false;
+    musicResumeHandler = null;
+  }
+
+  function renderMusicPlayer() {
+    const hasTrack = Boolean(backgroundTrack);
+    const isPlaying = hasTrack && !refs.backgroundMusic.paused;
+
+    refs.musicControl.classList.toggle("has-track", hasTrack);
+    refs.musicControl.classList.toggle("is-playing", isPlaying);
+    refs.musicControl.setAttribute(
+      "aria-label",
+      isPlaying ? "Background music is playing. Open music player" : "Open background music player",
+    );
+    refs.musicTrackStatus.textContent = hasTrack ? (isPlaying ? "Now playing" : "Ready") : "No track selected";
+    refs.musicTrackName.textContent = hasTrack ? backgroundTrack.name : "Choose an audio file to begin";
+    refs.musicPlayToggle.disabled = !hasTrack || musicFileBusy;
+    refs.musicFileRemove.disabled = !hasTrack || musicFileBusy;
+    refs.musicPlayToggle.setAttribute("aria-label", isPlaying ? "Pause background music" : "Play background music");
+    refs.musicPlayIcon.classList.toggle("hidden", isPlaying);
+    refs.musicPauseIcon.classList.toggle("hidden", !isPlaying);
+    refs.musicVisualizer.classList.toggle("is-playing", isPlaying);
+    refs.musicFileSelect.disabled = musicFileBusy;
+    refs.musicFileSelect.textContent = musicFileBusy ? "Saving…" : hasTrack ? "Replace audio" : "Choose audio";
+    renderMusicVolume();
+  }
+
+  function renderMusicVolume() {
+    const percentage = Math.round(state.settings.musicVolume * 100);
+    refs.musicVolume.value = String(percentage);
+    refs.musicVolumeValue.value = `${percentage}%`;
+    refs.musicVolumeValue.textContent = `${percentage}%`;
+    refs.musicVolume.style.setProperty("--volume-percent", `${percentage}%`);
+  }
+
+  function openMediaDatabase() {
+    return new Promise((resolve, reject) => {
+      if (!window.indexedDB) {
+        reject(new Error("IndexedDB is unavailable."));
+        return;
+      }
+
+      const request = window.indexedDB.open(MEDIA_DATABASE_NAME, 1);
+      request.onupgradeneeded = () => {
+        const database = request.result;
+        if (!database.objectStoreNames.contains(MEDIA_STORE_NAME)) {
+          database.createObjectStore(MEDIA_STORE_NAME);
+        }
+      };
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error || new Error("Could not open audio storage."));
+      request.onblocked = () => reject(new Error("Audio storage is open in another tab. Close it and try again."));
+    });
+  }
+
+  async function readStoredBackgroundMusic() {
+    const database = await openMediaDatabase();
+    return new Promise((resolve, reject) => {
+      const transaction = database.transaction(MEDIA_STORE_NAME, "readonly");
+      const request = transaction.objectStore(MEDIA_STORE_NAME).get(BACKGROUND_MUSIC_KEY);
+      request.onsuccess = () => {
+        database.close();
+        const track = request.result;
+        if (!track || !(track.blob instanceof Blob)) {
+          resolve(null);
+          return;
+        }
+        resolve(track);
+      };
+      request.onerror = () => {
+        database.close();
+        reject(request.error || new Error("Could not read the saved track."));
+      };
+    });
+  }
+
+  async function writeStoredBackgroundMusic(track) {
+    const database = await openMediaDatabase();
+    return new Promise((resolve, reject) => {
+      const transaction = database.transaction(MEDIA_STORE_NAME, "readwrite");
+      transaction.objectStore(MEDIA_STORE_NAME).put(track, BACKGROUND_MUSIC_KEY);
+      transaction.oncomplete = () => {
+        database.close();
+        resolve();
+      };
+      transaction.onerror = () => {
+        database.close();
+        reject(transaction.error || new Error("Could not save the audio file."));
+      };
+      transaction.onabort = () => {
+        database.close();
+        reject(transaction.error || new Error("Audio storage ran out of space."));
+      };
+    });
+  }
+
+  async function deleteStoredBackgroundMusic() {
+    const database = await openMediaDatabase();
+    return new Promise((resolve, reject) => {
+      const transaction = database.transaction(MEDIA_STORE_NAME, "readwrite");
+      transaction.objectStore(MEDIA_STORE_NAME).delete(BACKGROUND_MUSIC_KEY);
+      transaction.oncomplete = () => {
+        database.close();
+        resolve();
+      };
+      transaction.onerror = () => {
+        database.close();
+        reject(transaction.error || new Error("Could not delete the audio file."));
+      };
+      transaction.onabort = () => {
+        database.close();
+        reject(transaction.error || new Error("Could not delete the audio file."));
+      };
     });
   }
 
@@ -814,7 +1228,7 @@
   function requestReset() {
     openConfirm({
       title: "Reset the entire game?",
-      copy: "All quests, rewards, XP, Gold, streaks, and activity in this browser will be permanently erased.",
+      copy: "Your profile, quests, rewards, progress, activity, and saved background track will be permanently erased from this browser.",
       confirmLabel: "Reset everything",
       tone: "danger",
       onConfirm: resetGame,
@@ -822,6 +1236,18 @@
   }
 
   function resetGame() {
+    musicStorageGeneration += 1;
+    musicFileBusy = false;
+    disarmMusicResume();
+    backgroundTrack = null;
+    refs.backgroundMusic.pause();
+    refs.backgroundMusic.removeAttribute("src");
+    refs.backgroundMusic.load();
+    releaseMusicObjectUrl();
+    void deleteStoredBackgroundMusic().catch(() => {
+      showToast("Music cleanup incomplete", "The saved audio could not be removed from browser storage.", "error");
+    });
+
     state = createDefaultState();
     state.player.energyCheckedDate = toDateKey(new Date());
     questFilter = "active";
@@ -859,6 +1285,7 @@
     renderRewards();
     renderActivity();
     renderSoundToggle();
+    renderMusicPlayer();
   }
 
   function renderDate() {

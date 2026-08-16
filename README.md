@@ -11,9 +11,10 @@ Questbound is a lightweight, single-page productivity RPG for turning concrete t
 - Daily streaks with an XP multiplier up to 1.5×
 - Focus Energy that recovers when quests are completed
 - Confetti, short synthesized reward tones, and a sound toggle
+- A looping background-music player for user-selected MP3, WAV, OGG, M4A, AAC, or WebM files
 - Active, cleared, and combined quest views
 - Recent victory history
-- LocalStorage persistence with validation and safe fallbacks
+- LocalStorage and IndexedDB persistence with validation and safe fallbacks
 - Keyboard-friendly controls, semantic markup, live announcements, and reduced-motion support
 - Responsive dark retro-RPG interface
 
@@ -49,7 +50,9 @@ Completing at least one quest on consecutive calendar days increases the XP mult
 
 ## Data and privacy
 
-All game data, including the compressed profile picture, is stored under the `questbound-rpg-v1` LocalStorage key in the current browser. Nothing is transmitted to a server. Clearing browser storage or using **Reset game data** permanently removes the local save.
+Game data, including the compressed profile picture, is stored under the `questbound-rpg-v1` LocalStorage key in the current browser. A user-selected background track is stored separately in the browser's `questbound-media-v1` IndexedDB database so larger audio files do not overload LocalStorage. Nothing is transmitted to a server or committed to GitHub. Clearing browser storage or using **Reset game data** permanently removes the local save and track.
+
+Browsers require a user interaction before audio can begin. If a saved track cannot resume automatically after refresh, selecting **Play** in the music panel starts it.
 
 ## Browser support
 
