@@ -1,0 +1,11 @@
+"use client";
+import { useEffect, useMemo, useState } from "react";
+import { demoState } from "./seed";
+import type { AppState } from "./domain";
+
+const KEY="edgelab:v2";
+export function useEdgeLab(){const [state,setState]=useState<AppState>(demoState);const [ready,setReady]=useState(false);useEffect(()=>{try{const raw=localStorage.getItem(KEY);if(raw)setState(JSON.parse(raw));}catch{}setReady(true);},[]);useEffect(()=>{if(ready)localStorage.setItem(KEY,JSON.stringify(state));},[state,ready]);return {state,setState,ready,reset:()=>{localStorage.removeItem(KEY);setState(structuredClone(demoState));}};}
+export function download(name:string,text:string,type="application/json"){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;a.click();URL.revokeObjectURL(a.href);}
+export function csv(rows:Record<string,unknown>[]){if(!rows.length)return "";const keys=Object.keys(rows[0]);const q=(v:unknown)=>`"${String(v??"").replaceAll('"','""')}"`;return [keys.map(q).join(","),...rows.map(r=>keys.map(k=>q(r[k])).join(","))].join("\n");}
+export function useDebounced<T>(v:T,ms=220){const [x,setX]=useState(v);useEffect(()=>{const t=setTimeout(()=>setX(v),ms);return()=>clearTimeout(t)},[v,ms]);return x;}
+export function useAnalytics(state:AppState){return useMemo(()=>{const decisions=state.decisions,avg=decisions.length?Math.round(decisions.reduce((n,d)=>n+d.score,0)/decisions.length):0;const accurate=decisions.filter(d=>d.score>=75).length;const unclear=decisions.filter(d=>d.classification==="unclear"&&d.score>=75).length;const falsePos=decisions.filter(d=>d.classification==="valid"&&d.score<75).length;const contexts=Object.fromEntries(["trend","broad-range","tight-range","transition","breakout","failed-breakout","pullback","ambiguous"].map(c=>{const ds=decisions.filter(d=>d.context===c);return[c,ds.length?Math.round(ds.reduce((n,d)=>n+d.score,0)/ds.length):0]}));const mistakes=state.journal.flatMap(j=>j.mistakes).reduce<Record<string,number>>((a,m)=>(a[m]=(a[m]||0)+1,a),{});return {avg,accurate:decisions.length?Math.round(accurate/decisions.length*100):0,unclear,falsePositiveRate:decisions.length?Math.round(falsePos/decisions.length*100):0,contexts,mistakes};},[state]);}
