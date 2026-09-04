@@ -1,0 +1,36 @@
+{
+    "name": "SoulMiners",
+    "tree": {
+        "$className": "DataModel",
+        "ReplicatedStorage": {
+            "$className": "ReplicatedStorage",
+            "Shared": {
+                "$path": "src/ReplicatedStorage/Shared"
+            }
+        },
+        "ServerScriptService": {
+            "$className": "ServerScriptService",
+            "Core": {
+                "$path": "src/ServerScriptService/Core"
+            },
+            "Services": {
+                "$path": "src/ServerScriptService/Services"
+            },
+            "Lib": {
+                "$path": "src/ServerScriptService/Lib"
+            }
+        },
+        "StarterPlayer": {
+            "$className": "StarterPlayer",
+            "StarterPlayerScripts": {
+                "$className": "StarterPlayerScripts",
+                "Core": {
+                    "$path": "src/StarterPlayer/StarterPlayerScripts/Core"
+                },
+                "Controllers": {
+                    "$path": "src/StarterPlayer/StarterPlayerScripts/Controllers"
+                }
+            }
+        }
+    }
+}
